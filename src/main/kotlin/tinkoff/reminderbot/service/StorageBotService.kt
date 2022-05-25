@@ -1,10 +1,6 @@
 package tinkoff.reminderbot.service
 
 import org.springframework.stereotype.Service
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage
-import org.telegram.telegrambots.meta.api.objects.Message
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import tinkoff.reminderbot.model.Reminder
 import tinkoff.reminderbot.model.UserLevel
 import tinkoff.reminderbot.repository.ReminderRepository
@@ -13,7 +9,7 @@ import java.time.LocalDateTime
 
 
 @Service
-class BotService(val reminderRepository: ReminderRepository, val userLevelRepository: UserLevelRepository) {
+class StorageBotService(val reminderRepository: ReminderRepository, val userLevelRepository: UserLevelRepository) {
 
     fun getUserLevel(chatId: Long) = userLevelRepository.findById(chatId).get().level
 
@@ -81,7 +77,7 @@ class BotService(val reminderRepository: ReminderRepository, val userLevelReposi
         reminderRepository.save(Reminder(chatId, userLevel.reminder, date, userLevel.repeatEveryMinutes))
         userLevel.level = lvl
         userLevel.remindTime = null
-        userLevel.repeatEveryMinutes=null
+        userLevel.repeatEveryMinutes = null
         userLevelRepository.save(userLevel)
     }
 
@@ -103,8 +99,7 @@ class BotService(val reminderRepository: ReminderRepository, val userLevelReposi
 
     fun getAllRemindersNow(): List<Reminder> {
         var list = reminderRepository.findAll()
-        var list2 = reminderRepository.findAll()
-        println(LocalDateTime.now())
+        var list2 = list.toList()
         list.removeAll {
             it.remindTime == null ||
                     it.remindTime!! < LocalDateTime.now().minusSeconds(59) || it.remindTime!! > LocalDateTime.now()
@@ -115,7 +110,7 @@ class BotService(val reminderRepository: ReminderRepository, val userLevelReposi
                 (it.remindTime!! > LocalDateTime.now().minusSeconds(59) && it.remindTime!! < LocalDateTime.now()
                     .plusSeconds(59))
             ) {
-                it.remindTime= it.remindTime!!.plusMinutes(
+                it.remindTime = it.remindTime!!.plusMinutes(
                     it.repeatEveryMinutes
                 )
                 reminderRepository.save(it)

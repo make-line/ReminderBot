@@ -1,4 +1,4 @@
-package tinkoff.reminderbot
+package tinkoff.reminderbot.service
 
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -10,8 +10,6 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow
-import tinkoff.reminderbot.service.BotService
-import tinkoff.reminderbot.util.getCorrectNumber
 import tinkoff.reminderbot.util.getFullPattern
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -19,7 +17,7 @@ import java.time.format.DateTimeParseException
 
 
 @Service
-class ReminderBot(val botService: BotService) : TelegramLongPollingBot() {
+class ReminderBot(val botService: StorageBotService) : TelegramLongPollingBot() {
 
     @Value("\${telegram.botName}")
     private val botName: String = ""
@@ -47,7 +45,7 @@ class ReminderBot(val botService: BotService) : TelegramLongPollingBot() {
                 when (userLevel) {
                     0 -> {
                         val responseText = if (message.hasText()) {
-                            when (val messageText = message.text) {
+                            when (message.text) {
                                 "Создать напоминание" -> "Введите напоминание"
                                 "Посмотреть все напоминания" -> "Посмотреть все напоминания"
                                 "Создать постоянное напоминание" -> "Введите постоянное напоминание"
@@ -77,15 +75,7 @@ class ReminderBot(val botService: BotService) : TelegramLongPollingBot() {
     private fun setTime(chatId: Long, massage: String) {
         if (botService.getUser(chatId).repeatEveryMinutes != null) {
             if (massage == "Отмена") {
-                botService.changeLevelAndClean(chatId, 0)
-                var responseMessage = SendMessage(chatId.toString(), "Напоминание стерто")
-                responseMessage.enableMarkdown(true)
-                responseMessage.replyMarkup = getReplyMarkup(
-                    listOf(
-                        listOf("Создать напоминание"),
-                        listOf("Посмотреть все напоминания", "Создать постоянное напоминание")
-                    )
-                )
+                cancel(chatId)
             } else {
                 try {
                     println(botService.getUser(chatId))
@@ -111,15 +101,7 @@ class ReminderBot(val botService: BotService) : TelegramLongPollingBot() {
                     execute(responseMessage)
                 }
             }
-        }
-
-
-
-
-
-        else {
-//            println(botService.getUser(chatId))
-//            println(LocalDateTime.parse(getFullPattern(massage, true), formatterFull))
+        } else {
             if (massage == "Отмена") {
 
                 botService.changeLevel(chatId, 2)
@@ -175,44 +157,46 @@ class ReminderBot(val botService: BotService) : TelegramLongPollingBot() {
         var responseMessage = SendMessage(chatId.toString(), "Напоминие создано")
         if (botService.getUser(chatId).repeatEveryMinutes != null) {
             responseMessage = SendMessage(chatId.toString(), "Напоминие стерто")
-            if (massage == "Каждый день") {
-                responseMessage = SendMessage(
-                    chatId.toString(), "Введите время напоминания по следующим образцам:\n" +
-                            "чч:мм"
-                )
-                responseMessage.replyMarkup = getReplyMarkup(
-                    listOf(
-                        listOf("Отмена")
+            when (massage) {
+                "Каждый день" -> {
+                    responseMessage = SendMessage(
+                        chatId.toString(), "Введите время напоминания по следующим образцам:\n" +
+                                "чч:мм"
                     )
-                )
-                botService.changeLevelAndTime(chatId, 3, 1440)
-            }
-            else if (massage == "Каждую неделю") {
-                responseMessage = SendMessage(
-                    chatId.toString(), "Введите время и дату первого напоминания по следующему образцу:\n" +
-                            "дд.мм чч:мм"
-                )
-                responseMessage.replyMarkup = getReplyMarkup(
-                    listOf(
-                        listOf("Отмена")
+                    responseMessage.replyMarkup = getReplyMarkup(
+                        listOf(
+                            listOf("Отмена")
+                        )
                     )
-                )
-                botService.changeLevelAndTime(chatId, 3, 10080)
-            } else {
-                botService.changeLevelAndClean(chatId, 0)
-                responseMessage.enableMarkdown(true)
-                responseMessage.replyMarkup = getReplyMarkup(
-                    listOf(
-                        listOf("Создать напоминание"),
-                        listOf("Посмотреть все напоминания", "Создать постоянное напоминание")
+                    botService.changeLevelAndTime(chatId, 3, 1440)
+                }
+                "Каждую неделю" -> {
+                    responseMessage = SendMessage(
+                        chatId.toString(), "Введите время и дату первого напоминания по следующему образцу:\n" +
+                                "дд.мм чч:мм"
                     )
-                )
+                    responseMessage.replyMarkup = getReplyMarkup(
+                        listOf(
+                            listOf("Отмена")
+                        )
+                    )
+                    botService.changeLevelAndTime(chatId, 3, 10080)
+                }
+                else -> {
+                    botService.changeLevelAndClean(chatId, 0)
+                    responseMessage.enableMarkdown(true)
+                    responseMessage.replyMarkup = getReplyMarkup(
+                        listOf(
+                            listOf("Создать напоминание"),
+                            listOf("Посмотреть все напоминания", "Создать постоянное напоминание")
+                        )
+                    )
+                }
             }
             execute(responseMessage)
 
 
-        }
-        else {
+        } else {
             if (massage == "Выбрать время") {
                 responseMessage = SendMessage(
                     chatId.toString(), "Введите время напоминания по следующим образцам:\n" +
@@ -246,26 +230,17 @@ class ReminderBot(val botService: BotService) : TelegramLongPollingBot() {
 
     private fun initReminder(chatId: Long, reminder: String) {
         if (reminder == "Отмена") {
-            botService.changeLevelAndClean(chatId, 0)
-            var responseMessage = SendMessage(chatId.toString(), "Напоминание стерто")
-            responseMessage.enableMarkdown(true)
-            responseMessage.replyMarkup = getReplyMarkup(
-                listOf(
-                    listOf("Создать напоминание"),
-                    listOf("Посмотреть все напоминания", "Создать постоянное напоминание")
-                )
-            )
-            execute(responseMessage)
+            cancel(chatId)
 
         } else {
             if (botService.getUser(chatId).repeatEveryMinutes != null) {
                 val responseMessage = SendMessage(chatId.toString(), "Когда тебе напоминать?")
-                botService.changeLevelAndSetReminder(chatId, 2,reminder)
+                botService.changeLevelAndSetReminder(chatId, 2, reminder)
                 responseMessage.enableMarkdown(true)
                 responseMessage.replyMarkup = getReplyMarkup(
                     listOf(
                         listOf("Каждый день", "Каждую неделю"),
-                        listOf( "Отмена")
+                        listOf("Отмена")
                     )
                 )
                 execute(responseMessage)
@@ -288,96 +263,108 @@ class ReminderBot(val botService: BotService) : TelegramLongPollingBot() {
     }
 
 
-
-private fun sendNotification(chatId: Long, responseText: String) {
-    var responseMessage = SendMessage(chatId.toString(), responseText)
-    responseMessage.enableMarkdown(true)
-    when (responseText) {
-        "Введите напоминание" -> {
-            botService.changeLevel(chatId, 1)
-            responseMessage.replyMarkup = getReplyMarkup(
-                listOf(
-                    listOf("Отмена"),
-                )
-            )
-        }
-        "Введите постоянное напоминание" -> {
-            botService.changeLevelConst(chatId, 1)
-            responseMessage.replyMarkup = getReplyMarkup(
-                listOf(
-                    listOf("Отмена"),
-                )
-            )
-        }
-        "Посмотреть все напоминания" -> {
-            botService.getAllRemindersByUser(chatId).forEach {
-                var status=""
-                if(it.repeatEveryMinutes!=null) status="Постоянное"
-                execute(it.id?.let { it1 ->
-                    sendInlineKeyBoardMessage(
-                        chatId, it.reminder + "\n\n" + ((it.remindTime?.format(formatterFull) + "\n\n" + status)
-                            ?: "") + "\n", it1
+    private fun sendNotification(chatId: Long, responseText: String) {
+        var responseMessage = SendMessage(chatId.toString(), responseText)
+        responseMessage.enableMarkdown(true)
+        when (responseText) {
+            "Введите напоминание" -> {
+                botService.changeLevel(chatId, 1)
+                responseMessage.replyMarkup = getReplyMarkup(
+                    listOf(
+                        listOf("Отмена"),
                     )
-                })
+                )
             }
-            responseMessage.replyMarkup = getReplyMarkup(
+            "Введите постоянное напоминание" -> {
+                botService.changeLevelConst(chatId, 1)
+                responseMessage.replyMarkup = getReplyMarkup(
+                    listOf(
+                        listOf("Отмена"),
+                    )
+                )
+            }
+            "Посмотреть все напоминания" -> {
+                botService.getAllRemindersByUser(chatId).forEach {
+                    var status = ""
+                    if (it.repeatEveryMinutes != null) status = "Постоянное"
+                    execute(it.id?.let { it1 ->
+                        sendInlineKeyBoardMessage(
+                            chatId, it.reminder + "\n\n" + ((it.remindTime?.format(formatterFull) + "\n\n" + status)
+                                ?: "") + "\n", it1
+                        )
+                    })
+                }
+                responseMessage.replyMarkup = getReplyMarkup(
+                    listOf(
+                        listOf("Создать напоминание"),
+                        listOf("Посмотреть все напоминания", "Создать постоянное напоминание")
+                    )
+                )
+                responseMessage =
+                    SendMessage(chatId.toString(), "Всего напоминий ${botService.getAllRemindersByUser(chatId).size}")
+            }
+            else -> responseMessage.replyMarkup = getReplyMarkup(
                 listOf(
                     listOf("Создать напоминание"),
                     listOf("Посмотреть все напоминания", "Создать постоянное напоминание")
                 )
             )
-            responseMessage =
-                SendMessage(chatId.toString(), "Всего напоминий ${botService.getAllRemindersByUser(chatId).size}")
         }
-        else -> responseMessage.replyMarkup = getReplyMarkup(
+        execute(responseMessage)
+    }
+
+    private fun getReplyMarkup(allButtons: List<List<String>>): ReplyKeyboardMarkup {
+        val markup = ReplyKeyboardMarkup()
+        markup.keyboard = allButtons.map { rowButtons ->
+            val row = KeyboardRow()
+            rowButtons.forEach { rowButton -> row.add(rowButton) }
+            row
+        }
+        return markup
+    }
+
+
+    fun sendReminder(chatId: Long, id: Long) {
+        val responseMessage = SendMessage(chatId.toString(), botService.getReminderMessage(id)!!)
+        responseMessage.enableMarkdown(true)
+        responseMessage.replyMarkup = getReplyMarkup(
             listOf(
                 listOf("Создать напоминание"),
                 listOf("Посмотреть все напоминания", "Создать постоянное напоминание")
             )
         )
+        execute(responseMessage)
     }
-    execute(responseMessage)
-}
 
-private fun getReplyMarkup(allButtons: List<List<String>>): ReplyKeyboardMarkup {
-    val markup = ReplyKeyboardMarkup()
-    markup.keyboard = allButtons.map { rowButtons ->
-        val row = KeyboardRow()
-        rowButtons.forEach { rowButton -> row.add(rowButton) }
-        row
+    fun sendInlineKeyBoardMessage(chatId: Long, message: String, id: Long): SendMessage? {
+        val inlineKeyboardMarkup = InlineKeyboardMarkup()
+        val inlineKeyboardButton1 = InlineKeyboardButton()
+        inlineKeyboardButton1.text = "Удалить"
+        inlineKeyboardButton1.callbackData = id.toString()
+        val keyboardButtonsRow1: MutableList<InlineKeyboardButton> = ArrayList()
+        keyboardButtonsRow1.add(inlineKeyboardButton1)
+        val rowList: MutableList<List<InlineKeyboardButton>> = ArrayList()
+        rowList.add(keyboardButtonsRow1)
+        inlineKeyboardMarkup.keyboard = rowList
+        val send = SendMessage()
+        send.text = message
+        send.chatId = chatId.toString()
+        send.replyMarkup = inlineKeyboardMarkup
+        return send
     }
-    return markup
-}
 
-
-fun sendReminder(chatId: Long, id: Long) {
-    val responseMessage = SendMessage(chatId.toString(), botService.getReminderMessage(id)!!)
-    responseMessage.enableMarkdown(true)
-    responseMessage.replyMarkup = getReplyMarkup(
-        listOf(
-            listOf("Создать напоминание"),
-            listOf("Посмотреть все напоминания", "Создать постоянное напоминание")
+    fun cancel(chatId: Long) {
+        botService.changeLevelAndClean(chatId, 0)
+        var responseMessage = SendMessage(chatId.toString(), "Напоминание стерто")
+        responseMessage.enableMarkdown(true)
+        responseMessage.replyMarkup = getReplyMarkup(
+            listOf(
+                listOf("Создать напоминание"),
+                listOf("Посмотреть все напоминания", "Создать постоянное напоминание")
+            )
         )
-    )
-    execute(responseMessage)
-}
-
-fun sendInlineKeyBoardMessage(chatId: Long, message: String, id: Long): SendMessage? {
-    val inlineKeyboardMarkup = InlineKeyboardMarkup()
-    val inlineKeyboardButton1 = InlineKeyboardButton()
-    inlineKeyboardButton1.text = "Удалить"
-    inlineKeyboardButton1.callbackData = id.toString()
-    val keyboardButtonsRow1: MutableList<InlineKeyboardButton> = ArrayList()
-    keyboardButtonsRow1.add(inlineKeyboardButton1)
-    val rowList: MutableList<List<InlineKeyboardButton>> = ArrayList()
-    rowList.add(keyboardButtonsRow1)
-    inlineKeyboardMarkup.keyboard = rowList
-    val send = SendMessage()
-    send.text = message
-    send.chatId = chatId.toString()
-    send.replyMarkup = inlineKeyboardMarkup
-    return send
-}
+        execute(responseMessage)
+    }
 
 
 }
