@@ -11,9 +11,14 @@ import java.time.LocalDateTime
 class ScheduledService(val reminderBot: ReminderBot) {
 
     @Scheduled(cron = "*/60 * * * * *")
-    fun reportCurrentTime() {
-        reminderBot.botService.getAllRemindersNow()!!.forEach {
-            reminderBot.sendReminder(it.chatId!!, it.id!!)
+    fun reportCurrentTime():Boolean {
+        return try {
+            reminderBot.botService.getAllRemindersNow()!!.forEach {
+                reminderBot.sendReminder(it.chatId!!, it.id!!)
+            }
+            true
+        } catch (e:Exception){
+            false
         }
     }
 

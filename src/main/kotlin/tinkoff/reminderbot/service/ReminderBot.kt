@@ -15,7 +15,6 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
-
 @Service
 class ReminderBot(val botService: StorageBotService) : TelegramLongPollingBot() {
 
@@ -46,6 +45,7 @@ class ReminderBot(val botService: StorageBotService) : TelegramLongPollingBot() 
                     0 -> {
                         val responseText = if (message.hasText()) {
                             when (message.text) {
+                                "/start" -> "Привет! Этот бот умеет создавать постоянные, однократные и безвременные напоминания! Интерфейс оформлен в виде кнопок, чтобы тебе было удобнее"
                                 "Создать напоминание" -> "Введите напоминание"
                                 "Посмотреть все напоминания" -> "Посмотреть все напоминания"
                                 "Создать постоянное напоминание" -> "Введите постоянное напоминание"
@@ -324,8 +324,8 @@ class ReminderBot(val botService: StorageBotService) : TelegramLongPollingBot() 
     }
 
 
-    fun sendReminder(chatId: Long, id: Long) {
-        val responseMessage = SendMessage(chatId.toString(), botService.getReminderMessage(id)!!)
+    fun sendReminder(chatId: Long,id: Long) {
+        val responseMessage = SendMessage(chatId.toString(),"Напоминаю - \n\n"+ botService.getReminderMessage(id)!!)
         responseMessage.enableMarkdown(true)
         responseMessage.replyMarkup = getReplyMarkup(
             listOf(

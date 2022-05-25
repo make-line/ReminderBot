@@ -24,6 +24,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.telegram:telegrambots-spring-boot-starter:5.4.0.1")
     runtimeOnly("org.postgresql:postgresql")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.8.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.8.2")
+
+    testImplementation("io.mockk:mockk:1.12.3")
 
 }
 
